@@ -68,7 +68,9 @@ test('MCP lists ten tools and completes, replays, inspects and chunks one real s
     await s.call('loom_read', { resource: 'run', id: 'one', offset: 100, limit: 100 })
   ).value;
   assert.equal(page.sha256, pageTwo.sha256);
-  assert.equal((await s.call('loom_tools', {})).value.total, 0);
+  const catalog = (await s.call('loom_tools', {})).value;
+  assert.equal(catalog.total, 0);
+  assert.deepEqual(catalog.servers, []);
   assert.equal((await s.call('loom_cancel', { runId: 'wrong' })).value.cancelled, false);
   const scoped = await s.client.callTool({
     name: 'loom_run',

@@ -190,12 +190,10 @@ function registerHistory(server: McpServer, engine: Loom): void {
               revision: row.revision,
               checkpointId: row.checkpointId,
               messageCount: row.history.length,
-              recent: row.history
-                .slice(-10)
-                .map((item) => ({
-                  role: item.role,
-                  content: preview(item.content, PREVIEW_LENGTH),
-                })),
+              recent: row.history.slice(-10).map((item) => ({
+                role: item.role,
+                content: preview(item.content, PREVIEW_LENGTH),
+              })),
             }
           : null;
       }),
@@ -215,6 +213,7 @@ function registerTools(server: McpServer, engine: Loom): void {
         const tools = engine.tools();
         return {
           total: tools.length,
+          servers: engine.mcpServers(),
           tools: tools
             .slice(offset, offset + limit)
             .map(({ name, description, definitionHash, readOnly }) => ({

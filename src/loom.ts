@@ -103,6 +103,10 @@ export class Loom {
     this.assertOpen();
     return this.hecaton.list();
   }
+  mcpServers() {
+    this.assertOpen();
+    return this.hecaton.mcpServers();
+  }
   history(limit = 50, offset = 0) {
     this.assertOpen();
     return runHistory(this.store, limit, offset);

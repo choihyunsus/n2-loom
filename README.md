@@ -84,6 +84,8 @@ Supply Hecaton tool definitions through `tools`. Every definition has a stable n
 
 Tools execute in the order requested by the model. Hecaton enforces the host policy and records intent before an effect. For MCP tools, first import the approved bindings with Hecaton using the same database, project and agent. Start Loom with the matching `mcpServers` configuration.
 
+Remote tools enforce their own argument-level data scope. For a shared Soul server, bind each tool's `project` and `agent` arguments to the intended scope in the host policy. `mcpServers()` reports connection state and owned stdio process IDs.
+
 An optional versioned `confirmation.request(context)` hook approves mutating tool calls. Its immutable request includes the full arguments, tool definition, request ID, deadline and abort signal. The default confirmation deadline is 60 seconds.
 
 The default verification checks protocol completion and recorded tool outcomes. Its result is labelled `kind: 'protocol'`. A versioned `verifier.verify(context)` hook checks application-specific outcomes and records `kind: 'host'`, a summary and optional evidence. Failed tool calls require host verification for an eventual successful result. `preparation.prepare(context)` supplies an optional application precondition check. Preparation and verification callbacks perform repeatable checks.

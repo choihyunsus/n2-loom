@@ -37,7 +37,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mimir-native-${{ runner.os }}
-          path: node_modules/n2-mimir/dist/n2-mimir-core.node
+          path: node_modules/n2-mimir/dist/store/n2-mimir-core.node
           if-no-files-found: error
   package:
     needs: verify

@@ -48,4 +48,12 @@ const inspected = inspectLoom({
   agent: 'worker',
   view: 'history',
 });
-void [compatible, result, inspected, engine.history(), engine.cancel('one'), engine.close()];
+void [
+  compatible,
+  result,
+  inspected,
+  engine.history(),
+  engine.mcpServers(),
+  engine.cancel('one'),
+  engine.close(),
+];
