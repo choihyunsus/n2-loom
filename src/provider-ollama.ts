@@ -6,11 +6,12 @@ import type {
   ModelReply,
   ModelRequest,
   ModelTool,
+  ModelMessage,
 } from './types';
 import { arrayValue, modelUsage, objectValue, type JsonObject } from './model-validation';
 import { apiCredential, type HttpProviderOptions } from './provider-http';
 import { continuation, createWireProvider, storedState } from './provider-protocol';
-import { fingerprint, positiveInteger, textValue } from './values';
+import { fingerprint, identity, positiveInteger, textValue } from './values';
 const MAX_CALLS = 16;
 
 export interface OllamaOptions extends HttpProviderOptions {
@@ -72,12 +73,7 @@ function encode(
   for (const message of request.messages) {
     if (message.role === 'user') messages.push({ role: 'user', content: message.content });
     else if (message.role === 'assistant') messages.push(continuation(message.reply, format));
-    else if (mode === 'native')
-      messages.push({
-        role: 'tool',
-        tool_name: message.name,
-        content: JSON.stringify(message.result),
-      });
+    else if (mode === 'native') messages.push(nativeResult(message));
     else
       messages.push({
         role: 'user',
@@ -100,6 +96,26 @@ function encode(
     body.tools = request.tools.map((tool) => ({ type: 'function', function: { ...tool } }));
   else body.format = envelopeSchema(request.tools);
   return body;
+}
+function nativeResult(message: Extract<ModelMessage, { role: 'tool' }>): JsonObject {
+  const result: JsonObject = {
+    role: 'tool',
+    tool_name: message.name,
+    content: JSON.stringify(message.result),
+  };
+  const metadata = message.metadata;
+  if (
+    metadata &&
+    typeof metadata === 'object' &&
+    !Array.isArray(metadata) &&
+    metadata.ollamaCallId !== undefined
+  ) {
+    const id = identity(metadata.ollamaCallId, 'Ollama tool call ID');
+    if (id !== message.callId)
+      throw new Error('Ollama tool result ID conflicts with its call metadata');
+    result.tool_call_id = id;
+  }
+  return result;
 }
 
 function envelopeSchema(tools: readonly ModelTool[]): JsonValue {
@@ -146,18 +162,8 @@ function decode(
       throw new Error('Unexpected JSON envelope fields');
     text = textValue(envelope.text, 'envelope text', 131072);
     rawCalls = arrayValue(envelope.calls, MAX_CALLS);
-  } else
-    rawCalls = arrayValue(message.tool_calls ?? [], MAX_CALLS).map(
-      (raw) => objectValue(raw).function!,
-    );
-  const calls: ModelCall[] = rawCalls.map((raw, index) => {
-    const call = objectValue(raw);
-    return {
-      id: `call_${fingerprint({ requestId: request.requestId, index }).slice(0, 32)}`,
-      name: textValue(call.name, 'tool name'),
-      arguments: objectValue(call.arguments),
-    };
-  });
+  } else rawCalls = arrayValue(message.tool_calls ?? [], MAX_CALLS);
+  const calls = decodeCalls(rawCalls, mode, request);
   const stop =
     row.done !== true || row.done_reason !== 'stop'
       ? 'incomplete'
@@ -172,4 +178,24 @@ function decode(
     model: textValue(row.model ?? request.model, 'response model', 256),
     providerState: storedState(format, message),
   };
+}
+function decodeCalls(
+  values: JsonValue[],
+  mode: 'native' | 'json',
+  request: ModelRequest,
+): ModelCall[] {
+  return values.map((raw, index) => {
+    const entry = objectValue(raw),
+      call = mode === 'native' ? objectValue(entry.function) : entry;
+    const upstreamId =
+      mode === 'native' && entry.id !== undefined
+        ? identity(entry.id, 'Ollama tool call ID')
+        : undefined;
+    return {
+      id: upstreamId ?? `call_${fingerprint({ requestId: request.requestId, index }).slice(0, 32)}`,
+      name: textValue(call.name, 'tool name'),
+      arguments: objectValue(call.arguments),
+      ...(upstreamId === undefined ? {} : { metadata: { ollamaCallId: upstreamId } }),
+    };
+  });
 }

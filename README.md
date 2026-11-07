@@ -27,12 +27,12 @@ const loom = new Loom({
   dbPath: './data/mimir.db',
   project: 'demo',
   agent: 'assistant',
-  limits: { contextBytes: 3072, maxOutputTokens: 256 },
+  limits: { contextBytes: 8192, maxOutputTokens: 512 },
   provider: ollamaChat({
     id: 'local',
     model: process.env.N2_LOOM_MODEL,
     think: false,
-    contextLength: 4096,
+    contextLength: 8192,
   }),
 });
 
@@ -183,6 +183,8 @@ npm pack --dry-run
 ```
 
 The suite covers all five streaming protocols over loopback HTTP, ordered tool execution, native file verification, cancellation, restart, context handoffs, shared storage, commit failures, explicit reconciliation, CLI, MCP and stalled output. Cloud-adapter validation uses deterministic protocol fixtures. Installed-consumer checks exercise CommonJS and ES modules with strict declaration checking.
+
+A CPU-only Gemma4 4.6B Q4_K_M smoke run used two model requests and one registered read, returned the correct word count, and replayed from storage. It used two CPU threads, an 8,192-token model context, a 512-token output allowance and temperature zero. An earlier 128-token run stopped as incomplete. A separate generation requested two identical reads with distinct tool-call IDs. Execution receipts and replay protection apply to individual requests, while the host verifier checks the task outcome.
 
 ## License
 

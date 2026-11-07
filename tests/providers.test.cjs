@@ -170,3 +170,96 @@ test('stream final text mismatch and malformed tool arguments fail before a norm
   });
   await assert.rejects(second.result.generate(request()), /invalid_or_interrupted_stream/);
 });
+test('Ollama preserves distinct upstream IDs even when streamed function indices repeat and binds result IDs', async (t) => {
+  const { result: engine, requests } = await provider(t, 'ollama', (count) => {
+    const events = fixture('ollama', count === 1 ? 'Working' : 'Finished');
+    if (count === 1)
+      events.splice(
+        -1,
+        0,
+        ...['call-a', 'call-b'].map((id) => ({
+          model: 'fixture',
+          done: false,
+          message: {
+            role: 'assistant',
+            content: '',
+            tool_calls: [{ id, function: { index: 0, name: 'echo', arguments: { text: 'same' } } }],
+          },
+        })),
+      );
+    return events;
+  });
+  const first = await engine.generate(request());
+  assert.deepEqual(
+    first.calls.map((call) => call.id),
+    ['call-a', 'call-b'],
+  );
+  const messages = [
+    { role: 'user', content: 'Perform both requested reads' },
+    { role: 'assistant', reply: first },
+    ...first.calls.map((call) => ({
+      role: 'tool',
+      callId: call.id,
+      name: call.name,
+      metadata: call.metadata,
+      result: { success: true, output: 'observed' },
+    })),
+  ];
+  await engine.generate(request({ messages }));
+  assert.deepEqual(
+    requests[1].messages
+      .filter((message) => message.role === 'tool')
+      .map((message) => message.tool_call_id),
+    ['call-a', 'call-b'],
+  );
+  const changed = structuredClone(messages);
+  changed[2].metadata.ollamaCallId = 'wrong';
+  await assert.rejects(engine.generate(request({ messages: changed })), /conflicts/);
+  assert.equal(requests.length, 2);
+});
+test('Ollama rejects repeated upstream call IDs before returning executable tool calls', async (t) => {
+  const { result: engine } = await provider(t, 'ollama', () => {
+    const events = fixture('ollama', 'Working');
+    const call = {
+      id: 'duplicate',
+      function: { index: 0, name: 'echo', arguments: { text: 'same' } },
+    };
+    events.splice(-1, 0, {
+      model: 'fixture',
+      done: false,
+      message: { role: 'assistant', content: '', tool_calls: [call, call] },
+    });
+    return events;
+  });
+  await assert.rejects(engine.generate(request()), /invalid_or_interrupted_stream/);
+});
+test('Ollama continues older saved synthetic-ID history through its legacy tool-name contract', async (t) => {
+  const { result: engine, requests } = await provider(t, 'ollama', (count) => {
+    const events = fixture('ollama', count === 1 ? 'Working' : 'Finished', count === 1);
+    if (count === 1)
+      events.find((event) => event.message?.tool_calls?.length).message.tool_calls[0].id =
+        'upstream-old';
+    return events;
+  });
+  const first = await engine.generate(request());
+  first.calls[0].id = 'call_legacy_saved';
+  delete first.calls[0].metadata;
+  const final = await engine.generate(
+    request({
+      messages: [
+        { role: 'user', content: 'Continue saved work' },
+        { role: 'assistant', reply: first },
+        {
+          role: 'tool',
+          callId: first.calls[0].id,
+          name: first.calls[0].name,
+          result: { success: true, output: 'saved result' },
+        },
+      ],
+    }),
+  );
+  assert.equal(final.stop, 'complete');
+  const sent = requests[1].messages.find((message) => message.role === 'tool');
+  assert.equal(sent.tool_name, 'echo');
+  assert.equal(Object.hasOwn(sent, 'tool_call_id'), false);
+});

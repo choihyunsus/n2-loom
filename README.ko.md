@@ -27,12 +27,12 @@ const loom = new Loom({
   dbPath: './data/mimir.db',
   project: 'demo',
   agent: 'assistant',
-  limits: { contextBytes: 3072, maxOutputTokens: 256 },
+  limits: { contextBytes: 8192, maxOutputTokens: 512 },
   provider: ollamaChat({
     id: 'local',
     model: process.env.N2_LOOM_MODEL,
     think: false,
-    contextLength: 4096,
+    contextLength: 8192,
   }),
 });
 
@@ -182,6 +182,8 @@ npm pack --dry-run
 ```
 
 테스트는 다섯 제공자의 루프백 HTTP 스트리밍, 순서가 보장되는 도구 실행, 실제 파일 검증, 취소·재시작, 컨텍스트 인계, 공통 저장소, 저장 실패, 명시적 결과 복구, CLI·MCP와 막힌 출력 처리를 확인합니다. 클라우드 어댑터는 결정적인 프로토콜 모의 응답으로 검증합니다. 설치본은 CommonJS와 ES 모듈 및 엄격한 타입 선언 검사로 확인합니다.
+
+CPU 전용 Gemma4 4.6B Q4_K_M 실측에서는 모델 요청 두 번과 등록된 읽기 도구 한 번으로 단어 수를 확인하고, 저장된 결과를 재사용했습니다. CPU 스레드 두 개, 모델 컨텍스트 8,192토큰, 출력 허용량 512토큰과 온도 0을 사용했습니다. 앞선 128토큰 시험은 미완료로 종료됐고, 별도 생성에서는 서로 다른 호출 ID로 동일한 읽기를 두 번 요청했습니다. 실행 영수증과 재시도 보호는 개별 요청에 적용하며, 실제 작업 결과는 호스트 검증기로 확인합니다.
 
 ## 라이선스
 

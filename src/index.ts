@@ -14,12 +14,12 @@ import {
   type Flags,
 } from './cli-options';
 import { readJsonFile } from './cli-files';
-import { writeOutput, reportFailure, finishOutput } from './output';
+import { writeOutput, writeText, reportFailure, finishOutput } from './output';
 import { serve } from './mcp-serve';
 export async function main(args: string[]): Promise<void> {
   const { command, values } = parseCli(args);
   if (command === 'help') {
-    process.stdout.write(HELP);
+    await writeText(HELP);
     return;
   }
   if (['status', 'events', 'conversation', 'history', 'tool-status'].includes(command)) {

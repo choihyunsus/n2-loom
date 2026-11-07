@@ -7,10 +7,11 @@ The original MIT grant and notice are included in LICENSE-N2-GUMIHO.
 
 Runtime dependencies retain their upstream terms.
 
-n2-hecaton 1.0.0
+n2-hecaton 1.0.1
 https://github.com/choihyunsus/n2-hecaton
 MIT. Loom reuses its schema-checked tool execution, scoped database path validation,
-result validation, uncertainty reconciliation and bounded MCP framing transport.
+result validation, uncertainty reconciliation, bounded MCP framing transport and
+asynchronous standard-output handling.
 
 n2-gumiho 1.0.1
 https://github.com/choihyunsus/n2-gumiho

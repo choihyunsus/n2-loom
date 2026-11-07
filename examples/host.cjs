@@ -3,8 +3,8 @@ const { ollamaChat } = require('../dist/library');
 const model = process.env.N2_LOOM_MODEL;
 if (!model) throw new Error('Set N2_LOOM_MODEL to a model installed in your Ollama server');
 module.exports = {
-  limits: { contextBytes: 3072, maxOutputTokens: 256 },
-  provider: ollamaChat({ id: 'local', model, think: false, contextLength: 4096 }),
+  limits: { contextBytes: 8192, maxOutputTokens: 512 },
+  provider: ollamaChat({ id: 'local', model, think: false, contextLength: 8192 }),
   tools: [
     {
       name: 'word_count',
