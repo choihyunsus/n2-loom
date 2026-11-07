@@ -1,0 +1,45 @@
+N2 Loom adapts the dialogue architecture of N2 Daebung.
+The project source is distributed under the MIT license in LICENSE.
+
+Provider encoders, response validators and continuation formats were adapted from
+n2-gumiho 1.0.1, copyright (c) 2026 N2 AI Family, under the MIT license.
+The original MIT grant and notice are included in LICENSE-N2-GUMIHO.
+
+Runtime dependencies retain their upstream terms.
+
+n2-hecaton 1.0.0
+https://github.com/choihyunsus/n2-hecaton
+MIT. Loom reuses its schema-checked tool execution, scoped database path validation,
+result validation, uncertainty reconciliation and bounded MCP framing transport.
+
+n2-gumiho 1.0.1
+https://github.com/choihyunsus/n2-gumiho
+MIT. Shared provider and tool contracts.
+
+n2-recipe 1.0.1
+https://github.com/choihyunsus/n2-recipe
+MIT. Required lifecycle checks and shared-memory checkpoints.
+Its dependency graph includes n2-personas and n2-clotho 4.0.1.
+
+n2-mimir 3.0.3
+https://github.com/choihyunsus/n2-mimir
+The published non-commercial/commercial terms are reproduced in LICENSE-N2-MIMIR.
+
+n2-clotho 4.1.0 through Hecaton and 4.0.1 through N2R
+https://github.com/choihyunsus/n2-clotho
+The published non-commercial/commercial terms are reproduced in LICENSE-N2-CLOTHO.
+The referenced Apache text is reproduced in LICENSE-APACHE.
+
+@modelcontextprotocol/sdk
+https://github.com/modelcontextprotocol/typescript-sdk
+MIT
+
+better-sqlite3
+https://github.com/WiseLibs/better-sqlite3
+MIT
+
+zod
+https://github.com/colinhacks/zod
+MIT
+
+Exact dependency resolutions are recorded in package-lock.json in the source repository.
