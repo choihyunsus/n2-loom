@@ -6,7 +6,20 @@
 
 [English](README.md)
 
+<p align="center">
+  <img src="https://github.com/choihyunsus/n2-loom/raw/refs/heads/main/docs/images/comic.png" alt="대화를 시작하고 → 등록한 도구로 자료를 읽어 → 답변을 받고 → 대화와 진행 내용을 저장합니다." width="640">
+</p>
+
+대화를 시작하고 → 등록한 도구로 자료를 읽어 → 답변을 받고 → 대화와 진행 내용을 저장합니다.
+
+기능을 이야기로 표현한 만화입니다. 실제 앱 화면은 아닙니다.
+
+<details>
+<summary>동작 흐름 펼쳐 보기</summary>
+
 ![메시지 입력 → 모델과 도구 실행 → 대화와 결과 저장](https://github.com/choihyunsus/n2-loom/raw/refs/heads/main/docs/images/overview.ko.svg)
+
+</details>
 
 ## 이런 때 사용하세요
 
