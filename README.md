@@ -1,191 +1,68 @@
 # N2 Loom
 
-Durable AI dialogue with genuine streaming, scoped memory and verified tool execution.
+**Talk with an AI, let it use registered tools, and save the conversation and work progress.**
 
-[한국어 설명](README.ko.md)
+[![release: 1.0.0](https://img.shields.io/badge/release-1.0.0-2563eb)](https://github.com/choihyunsus/n2-loom/releases/tag/v1.0.0) [![runtime: Node.js 22+](https://img.shields.io/badge/runtime-Node.js%2022%2B-334155)](https://github.com/choihyunsus/n2-loom/blob/main/docs/reference.md) [![license: terms](https://img.shields.io/badge/license-terms-64748b)](https://github.com/choihyunsus/n2-loom/blob/main/LICENSE)
 
-Loom turns one configured model provider into a conversational agent. Hecaton runs registered tools, N2R requires preparation and verification around the work, and Mimir stores experiences beside the shared Soul database. Conversation revisions, model turns and tool receipts survive process restarts.
+[한국어](README.ko.md)
 
-## Install
+![Send a message → Run model and tools → Save chat and results](https://github.com/choihyunsus/n2-loom/raw/refs/heads/main/docs/images/overview.svg)
 
-Requires Node.js 22 or newer and a configured model endpoint.
+## When to use it
+
+Add streaming replies, tool use and recovery after interruptions to an AI assistant you are building.
+
+Supply a model connection and register the tools. Add your own function to verify the actual task outcome. Default checks cover response completion and recorded tool outcomes.
+
+## Try it
+
+Run `node --version` in a terminal and check for Node.js 22 or later. These commands create a fresh practice folder and install the GitHub release. Keep the example file and database in this folder.
 
 ```sh
+mkdir n2-loom-demo
+cd n2-loom-demo
+npm init -y
 npm install https://github.com/choihyunsus/n2-loom/releases/download/v1.0.0/n2-loom-1.0.0.tgz
 ```
 
-This release is distributed through GitHub Releases. Source builds use `npm ci` followed by `npm run build`.
+If installation reports a SQLite build error, you may need your platform’s C/C++ build tools. See the [installation reference](https://github.com/choihyunsus/n2-loom/blob/main/docs/reference.md) for platform requirements.
 
-## Start a dialogue
+Save the following as `demo.mjs` in the folder where you ran the install command.
 
-Save this example as `dialogue.mjs`.
+Start Ollama and run `ollama list` to see your installed models. Replace `YOUR_INSTALLED_MODEL` with one of those names. A model must already be installed, and replies vary by model.
 
 ```js
 import { Loom, ollamaChat } from 'n2-loom';
-
-const loom = new Loom({
-  dbPath: './data/mimir.db',
-  project: 'demo',
-  agent: 'assistant',
+const assistant = new Loom({
+  dbPath: './demo.db', project: 'demo', agent: 'assistant',
+  provider: ollamaChat({ id: 'local', model: 'YOUR_INSTALLED_MODEL', contextLength: 8192, think: false }),
   limits: { contextBytes: 8192, maxOutputTokens: 512 },
-  provider: ollamaChat({
-    id: 'local',
-    model: process.env.N2_LOOM_MODEL,
-    think: false,
-    contextLength: 8192,
-  }),
 });
-
 try {
-  const result = await loom.run(
-    {
-      runId: 'greeting-1',
-      conversationId: 'desk',
-      message: 'Say hello in one short sentence.',
-      mode: 'chat',
-    },
-    {
-      onEvent(event) {
-        if (event.type === 'delta') process.stdout.write(event.data.text);
-      },
-    },
-  );
-  console.log(result.success, result.verification, result.experienceId);
+  const result = await assistant.run({
+    runId: 'hello-1', conversationId: 'first-chat',
+    message: 'Say hello in one short sentence.', mode: 'chat',
+  });
+  console.log(result.success, result.output);
 } finally {
-  await loom.close();
+  await assistant.close();
 }
 ```
 
-CommonJS consumers can use the same exports through `require('n2-loom')`. The configured Ollama model must already be installed. The default Ollama endpoint is `http://127.0.0.1:11434/api/chat`.
-
-`agent` mode is the default and allows registered tools. `chat` mode requests text-only completion. Every mode passes through the required lifecycle.
-
-## Providers and streaming
-
-| Factory | Wire protocol | Visible text delivery |
-|---|---|---|
-| `openAIResponses` | Responses SSE | Incremental |
-| `anthropicMessages` | Messages SSE | Incremental |
-| `geminiInteractions` | Interactions SSE | Incremental |
-| `openAICompatible` | Chat Completions SSE | Incremental |
-| `ollamaChat` | Ollama NDJSON | Incremental in native tool mode |
-
-Each factory requires an explicit `id` and `model`. Cloud factories accept `apiKey`. `endpoint` takes a complete API URL. Ollama also accepts `toolMode`, `contextLength` and `think`. JSON tool mode validates a complete envelope before emitting decoded text and reports `textStreaming: false`.
-
-Match `limits.contextBytes` and `maxOutputTokens` to the model server's context window. The context limit measures serialized bytes. Custom providers call `request.onAttempt()` before each upstream attempt so retry accounting stays accurate.
-
-The adapters preserve provider-native continuation data, including function-call IDs and opaque reasoning state. Visible events contain the public text stream. A custom Gumiho `ModelProvider` can supply buffered generation, or implement `StreamingProvider` with `stream(request, onText)` and an explicit `textStreaming` flag. Class-based callbacks retain their receiver.
-
-HTTP transport applies UTF-8 validation, frame and response bounds, deadlines and cancellation. Eligible 429/503 responses can retry before stream consumption. A partially received response leaves a resumable model attempt with its budget reservation retained.
-
-## Tools and verification
-
-Supply Hecaton tool definitions through `tools`. Every definition has a stable name and version, an input schema and an execution callback. Loom selects a small schema set for the prompt. The read-only `loom_discover` tool searches the full registered catalog, and Hecaton validates every requested call.
-
-Tools execute in the order requested by the model. Hecaton enforces the host policy and records intent before an effect. For MCP tools, first import the approved bindings with Hecaton using the same database, project and agent. Start Loom with the matching `mcpServers` configuration.
-
-Remote tools enforce their own argument-level data scope. For a shared Soul server, bind each tool's `project` and `agent` arguments to the intended scope in the host policy. `mcpServers()` reports connection state and owned stdio process IDs.
-
-An optional versioned `confirmation.request(context)` hook approves mutating tool calls. Its immutable request includes the full arguments, tool definition, request ID, deadline and abort signal. The default confirmation deadline is 60 seconds.
-
-The default verification checks protocol completion and recorded tool outcomes. Its result is labelled `kind: 'protocol'`. A versioned `verifier.verify(context)` hook checks application-specific outcomes and records `kind: 'host'`, a summary and optional evidence. Failed tool calls require host verification for an eventual successful result. `preparation.prepare(context)` supplies an optional application precondition check. Preparation and verification callbacks perform repeatable checks.
-
-## Durable execution
-
-- Use a new `runId` for a new task. Retry an interrupted task with the same ID, input, callback versions and configuration.
-- Completed runs return their immutable receipt with `cached: true`.
-- Pending model attempts can retry within the cumulative request and output budgets.
-- A tool effect with an uncertain outcome exposes its Hecaton request ID. Inspect `toolStatus(id)`, verify the actual external outcome, and call `reconcileTool(id, result, evidence)` before resuming.
-- A newer task reserves a new conversation revision. A stale interrupted task is fenced from overwriting that conversation.
-- Final results, the shared experience, conversation history, checkpoint and terminal events commit together.
-
-Use `status(runId)`, `history(limit, offset)`, `conversation(id)` and `events(runId, afterSequence, limit)` to inspect progress. `cancel(runId)` targets the active run. `close()` cancels active work and closes owned connections.
-
-Events have durable sequence numbers. Set `afterSequence` when reconnecting. Replayed events carry `replay: true`. Group text deltas by their `turn` and `attempt` fields when replacing a partial model attempt. The final result contains the accepted full output and an explicit `error` for unsuccessful completion.
-
-Long contexts are shortened into source-labelled excerpts with links to the full recorded evidence. These handoffs retain cumulative budgets. Conversation history retains bounded user/assistant text across separate tasks. Exact provider-native tool continuation is retained within each durable run.
-
-## Shared Soul storage
-
-Use the same SQLite file and explicit `project`/`agent` values as the other modules. Loom uses Mimir's common experiences and adds seven scoped tables.
-
-```text
-loom_conversations  loom_runs        loom_models
-loom_tools          loom_events      loom_checkpoints
-loom_leases
-```
-
-Module schema version 1 is stored in `meta`. Records carry integrity hashes and bounded JSON. Existing partial or incompatible Loom schemas require explicit migration. Soul checkpoints and other modules retain their own record ownership.
-
-The Mimir Rust backend and its better-sqlite3 fallback share the storage contract. Application-level learning reuses scoped experiences, history and checkpoints. The model host manages model weights and fine-tuning.
-
-One logical workflow owns a project/agent scope at a time. Schedule Loom and Gumiho workflows sequentially for the same scope. Loom's provider adapters also implement Gumiho's provider contract for use in its tails.
-
-## Budgets
-
-| Budget | Default |
-|---|---|
-| Model turns / HTTP attempts / tool calls | 50 / 64 / 128 |
-| Failed tool calls / context generations | 5 / 10 |
-| Output tokens per request / total reserved | 2,048 / 131,072 |
-| Model context | 96,000 serialized bytes |
-| Model request / overall execution window | 120 seconds / 1 hour |
-| Observer / confirmation deadline | 30 / 60 seconds |
-| Event count / event payload | 32,768 / 8 MiB |
-| Trace payload budget | 32 MiB |
-
-Set `limits` to configure supported bounds. Request, tool and output reservations persist across retries. The execution window starts at run creation. A completed tool receipt can still be reconciled into the dialogue after that window, while further model and effect execution is stopped.
-
-Inputs support a 64 KiB message, 16 KiB system prompt and up to 200 history entries within 1 MiB. Final visible output is bounded at 128 KiB. The changed-file summary is bounded at 1,024 paths and 64 KiB, with complete per-call reports retained in tool receipts. Payload budgets cover serialized records. The host controls database retention and OS-level resource limits.
-
-## CLI and MCP
-
 ```sh
-n2-loom run --db ./data/mimir.db --project demo --agent assistant \
-  --provider ollama --model YOUR_INSTALLED_MODEL \
-  --run-id greeting-1 --conversation-id desk --message "Hello" --stream
-
-n2-loom status --db ./data/mimir.db --project demo --agent assistant --run-id greeting-1
-n2-loom help
+node demo.mjs
 ```
 
-`--stream` emits newline-delimited event objects followed by a result object. A failed completed task exits with a failure status. Inspection commands use read-only connections to existing storage. `--request file.json` supplies a complete request. Request and limits files accept UTF-8 with an optional BOM.
+On success, `true` and the model greeting appear. The same request ID reuses the stored result. Change `runId` for a new generation.
 
-`--host trusted-local.cjs` loads explicitly configured JavaScript callbacks. See `examples/host.cjs` for a local provider and a read-only word-count tool. Set `N2_LOOM_MODEL` before using that example. CLI cloud credentials use `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`.
+## Using it with Soul
 
-```sh
-n2-loom mcp --db ./data/mimir.db --project demo --agent assistant --host ./host.cjs
-```
+Point connected N2 modules at the same `mimir.db` file. `project` names the work and `agent` names the AI identity you will keep using. Match those values to continue working with the same records. Standalone use follows the same field layout.
 
-The MCP interface exposes ten tools.
+## Next steps and reference
 
-```text
-loom_run           loom_cancel        loom_status
-loom_read          loom_events        loom_history
-loom_conversation  loom_tools         loom_tool_status
-loom_reconcile
-```
+The [full reference](https://github.com/choihyunsus/n2-loom/blob/main/docs/reference.md) covers app integration, APIs, supported features, recovery and validation. The [release page](https://github.com/choihyunsus/n2-loom/releases/tag/v1.0.0) contains the installable version and release notes.
 
-Responses use bounded previews. `loom_read` returns full records in Unicode-character chunks with a SHA-256 value to compare across pages. MCP scope is fixed by the launching host. The stdio transport bounds frames, message rate and pending output. Stalled output writes expire after five seconds. The CLI closes its owned work before terminating a process retained by a blocked native write.
+A few terms used in the reference: **MCP** connects tools to an AI app, a **database** stores records, and the **host** is the app that connects and runs this module.
 
-## Host responsibilities
-
-The host supplies credentials, tool authorization, application-specific verification, UI and operating-system isolation. Callbacks receive abort signals. Callbacks that ignore cancellation can continue in their host environment, so hard termination and CPU/memory enforcement belong in host-owned workers or processes. A verification receipt describes the checks performed and their evidence.
-
-## Validation
-
-```sh
-npm ci
-npm test
-npm run typecheck:consumer
-npm audit --omit=dev --audit-level=low
-npm pack --dry-run
-```
-
-The suite covers all five streaming protocols over loopback HTTP, ordered tool execution, native file verification, cancellation, restart, context handoffs, shared storage, commit failures, explicit reconciliation, CLI, MCP and stalled output. Cloud-adapter validation uses deterministic protocol fixtures. Installed-consumer checks exercise CommonJS and ES modules with strict declaration checking.
-
-A CPU-only Gemma4 4.6B Q4_K_M smoke run used two model requests and one registered read, returned the correct word count, and replayed from storage. It used two CPU threads, an 8,192-token model context, a 512-token output allowance and temperature zero. An earlier 128-token run stopped as incomplete. A separate generation requested two identical reads with distinct tool-call IDs. Execution receipts and replay protection apply to individual requests, while the host verifier checks the task outcome.
-
-## License
-
-Loom source uses MIT. Mimir and Clotho retain their published non-commercial/commercial terms, including a separate commercial license requirement for the uses specified in those files. Review the bundled license files and `THIRD-PARTY-NOTICES` when choosing a distribution or commercial deployment model.
+Review the [license](https://github.com/choihyunsus/n2-loom/blob/main/LICENSE) for use and redistribution. Dependencies can have their own terms, including commercial-use conditions described in the reference.
